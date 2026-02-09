@@ -1,2 +1,5 @@
 # hktvmallDeals
-n8n flows for HKTVMALL deals
+
+For demonstration only, not for reuse.
+
+n8n flows for HKTVMALL deals tracking
