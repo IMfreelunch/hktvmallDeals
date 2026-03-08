@@ -1,0 +1,113 @@
+CREATE TABLE hktvmall.hktvmallDaily (
+    id integer NOT NULL GENERATED ALWAYS AS IDENTITY,  
+    storeid text DEFAULT 'NULL'::text,
+    itemid text NOT NULL,
+    itemname text NOT NULL,
+    itemurl text NOT NULL,
+    itemprice_curr numeric,
+    itemothers text,
+    imageurl character varying,
+    category text,
+    countryoforigin character varying,
+    purchasable boolean,
+    salesvolume integer,
+    numberofreviews integer,
+    averagerating numeric,
+    recorddatetime timestamp without time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+);
+
+CREATE TABLE hktvmall.hktvmalldaily_latest_category_aiprocess (
+    categorycode character varying,
+    categoryname character varying,
+    iscompleted boolean DEFAULT false
+);
+
+CREATE TABLE hktvmall.hktvmallCustomCategoryType (
+    id integer NOT NULL GENERATED ALWAYS AS IDENTITY,
+    categorycode character varying NOT NULL,
+    customtype character varying NOT NULL
+);
+
+CREATE VIEW hktvmall.V_hktvmallDaily_latest AS
+WITH
+  p AS (
+    SELECT
+      t.id,
+      max((elem.value ->> 'price'::text)::numeric) AS pricechart_max,
+      min((elem.value ->> 'price'::text)::numeric) AS pricechart_min
+    FROM
+      hktvmall.v_hktvmalldaily_haspricechart t
+      CROSS JOIN LATERAL jsonb_array_elements(t.itemothers_json::jsonb) elem (value)
+    WHERE
+      elem.value ? 'price'::text
+    GROUP BY
+      t.id
+  ),
+  itemmax AS (
+    SELECT
+      hktvmalldaily.itemid,
+      max(hktvmalldaily.recorddatetime) AS recorddatetime,
+      min(hktvmalldaily.recorddatetime) AS recorddatetime_min
+    FROM
+      hktvmall.hktvmalldaily
+    GROUP BY
+      hktvmalldaily.itemid
+  ),
+  productl AS (
+    SELECT
+      h_1.itemid,
+      h_1.itemname,
+      h_1.itemurl,
+      h_1.itemprice_curr,
+      h_1.itemothers,
+      h_1.id,
+      h_1.storeid,
+      h_1.imageurl,
+      h_1.category,
+      h_1.countryoforigin,
+      h_1.purchasable,
+      h_1.salesvolume,
+      h_1.numberofreviews,
+      h_1.averagerating,
+      i.recorddatetime_min AS recorddatetime,
+      h_1.recorddatetime AS recorddatetime_max
+    FROM
+      hktvmall.hktvmalldaily h_1
+      JOIN itemmax i ON h_1.itemid = i.itemid
+      AND h_1.recorddatetime = i.recorddatetime
+  )
+SELECT
+  h.itemprice_curr / NULLIF(p.pricechart_max, 0::numeric) AS discountpercent,
+  h.itemid,
+  h.itemname,
+  h.itemurl,
+  h.itemprice_curr,
+  h.itemothers,
+  h.id,
+  h.storeid,
+  h.imageurl,
+  h.category,
+  h.countryoforigin,
+  h.purchasable,
+  h.salesvolume,
+  h.numberofreviews,
+  h.averagerating,
+  h.recorddatetime,
+  h.recorddatetime_max,
+  p.pricechart_max,
+  p.pricechart_min
+FROM
+  productl h
+  LEFT JOIN p ON h.id = p.id;
+
+CREATE VIEW hktvmall.V_hktvmallDaily_latest_category AS
+SELECT DISTINCT
+  (elem.value ->> 'code'::text)::character varying AS categorycode,
+  (elem.value ->> 'name'::text)::character varying AS categoryname
+FROM
+  hktvmall.v_hktvmalldaily_latest
+  CROSS JOIN LATERAL jsonb_array_elements(v_hktvmalldaily_latest.category::jsonb) elem (value)
+WHERE
+  v_hktvmalldaily_latest.category IS NOT NULL
+ORDER BY
+  ((elem.value ->> 'name'::text)::character varying) DESC;

@@ -1,0 +1,557 @@
+{
+  "name": "Get products per store",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -144,
+        432
+      ],
+      "id": "7755c9e9-3660-49d0-af04-7a1a328f2ee5",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.hktvmall.com/hktv/zh/main/%E8%8F%AF%E8%A8%98%E6%B0%B8%E6%98%8C/s/{{ $json.StoreID }}?page=1&q=%3Aprice-asc%3Astreet%3Amain%3Astore%3A{{ $json.StoreID }}%3A",
+        "operation": "extractHtml"
+      },
+      "type": "n8n-nodes-crawl-and-scrape.crawleeNode",
+      "typeVersion": 1,
+      "position": [
+        288,
+        240
+      ],
+      "id": "139b39fc-c5cb-4b85-a2f1-8859084d1e33",
+      "name": "Get token [Crawl and Scrape]"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4fbefae3-a2d2-4195-b327-85db42bb7194",
+              "name": "recordDatetime",
+              "value": "={{ $now.toFormat(\"yyyy-MM-dd HH:mm:ss.SSS\") }}",
+              "type": "string"
+            },
+            {
+              "id": "18d45d34-5c9d-415a-b678-1a6280528efe",
+              "name": "StoreID",
+              "value": "H0955001",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        96,
+        432
+      ],
+      "id": "af3e7e57-385b-4c54-b7d7-88fcadb72c3e",
+      "name": "Initial currentDatetime and store ID variable [Edit Fields]",
+      "notes": "={{ $now.toFormat(\"yyyy-MM-dd HH:mm:ss.SSS\") }}\nH0955001\nH5590001\nB0846001"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b33812d0-9a4f-430a-8f3d-2f810f876036",
+              "name": "v_CSRFToken",
+              "value": "={{    $json.data.html.match(/CSRFToken[^\\r\\n]*/)?.[0].match(/[0-9a-f-]{36}/)?.[0].replace(/\\n/g, '').trim() || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "6f72101f-1b9c-4056-b850-d55bb498946b",
+              "name": "v_currentPage",
+              "value": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        512,
+        240
+      ],
+      "id": "3efc8805-ab69-48b5-bfdb-b25e1a673ab9",
+      "name": "Save token & initial variable currentPage [Edit Fields]"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://cate-search.hktvmall.com/query/products/",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "accept",
+              "value": "application/json, text/javascript, */*; q=0.01"
+            },
+            {
+              "name": "content-type",
+              "value": "application/x-www-form-urlencoded; charset=UTF-8"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "=:price-asc:street:main:store:{{ $('Initial currentDatetime and store ID variable [Edit Fields]').item.json.StoreID }}:"
+            },
+            {
+              "name": "currentPage",
+              "value": "={{ $json.v_currentPage }}"
+            },
+            {
+              "name": "pageSize",
+              "value": "60"
+            },
+            {
+              "name": "pageType",
+              "value": "searchResult"
+            },
+            {
+              "name": "lang",
+              "value": "zh"
+            },
+            {
+              "name": "CSRFToken",
+              "value": "={{ $json.v_CSRFToken }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        736,
+        -16
+      ],
+      "id": "420ac374-6502-4976-93c5-4f07781c967a",
+      "name": "Query product list [HTTP Request]"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "6ee65392-5c43-4a64-b9ac-a2e3f63dbba2",
+              "leftValue": "={{ $json.pagination.currentPage }}",
+              "rightValue": "={{ $json.pagination.totalPages }}",
+              "operator": {
+                "type": "number",
+                "operation": "lte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        960,
+        -96
+      ],
+      "id": "e14e7feb-b5f4-4319-8a03-4b095ca1e7f2",
+      "name": "Loop: currentPage <= totalPage? [If]"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b119898c-8cfe-4a95-afda-c22aadce4b5a",
+              "name": "v_currentPage",
+              "value": "={{ $('Loop: currentPage <= totalPage? [If]').item.json.pagination.currentPage + 1 }}",
+              "type": "number"
+            },
+            {
+              "id": "4d56274a-5665-438f-be65-9ab33da6acce",
+              "name": "v_product",
+              "value": "[]",
+              "type": "array"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1184,
+        80
+      ],
+      "id": "4e532136-7f5a-4581-a828-99e2422028f5",
+      "name": "Save products and update currentPage var [Edit Fields]"
+    },
+    {
+      "parameters": {
+        "jsCode": "// =============================================\n// NODE NAMES — match your workflow exactly\nconst LOOP_RESULT_NODE = \"Query product list [HTTP Request]\";\nconst STATIC_NODE      = \"Initial currentDatetime and store ID variable [Edit Fields]\";\n// =============================================\n\nconst allPages = [];\nlet runIndex = 0;\nconst MAX_RUNS = 20;  // safety net — adjust if you expect more than 20 pages\n\nwhile (runIndex < MAX_RUNS) {\n    try {\n        // Use branch 0 + runIndex\n        const itemsThisRun = $items(LOOP_RESULT_NODE, 0, runIndex);\n        \n        if (itemsThisRun.length === 0) {\n            console.log(`No more data after runIndex ${runIndex - 1}`);\n            break;\n        }\n\n        console.log(`Collected run ${runIndex}: ${itemsThisRun.length} items`);\n\n        itemsThisRun.forEach(item => {\n            allPages.push(item.json);\n        });\n\n        runIndex++;\n    } catch (err) {\n        // Gracefully stop if run not found (most common error)\n        if (err.message.includes(\"not found\") || err.message.includes(\"Run\")) {\n            console.log(`Stopped at runIndex ${runIndex}: ${err.message}`);\n            break;\n        }\n        // Rethrow other unexpected errors\n        throw err;\n    }\n}\n\n// Static data (run once)\nconst staticData = $items(STATIC_NODE, 0, 0)[0]?.json ?? {};\n\n// Debug output (visible in browser console)\nconsole.log(`Total pages collected: ${allPages.length}`);\nconsole.log(`Static data:`, staticData);\n\n// Return single item with everything\nreturn [{\n    json: {\n        allPages,\n        static: staticData,\n        totalIterations: allPages.length\n    }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1184,
+        -144
+      ],
+      "id": "0b172890-4834-482c-bf3f-1caca8908dcb",
+      "name": "Concat product list per pagination [Code in JavaScript]"
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "import json\nimport pandas as pd\n\n# === Data from JavaScript collector (one item) ===\ndata = _items[0]['json']\n\n# === Flatten ALL products from all 6 pages into one list ===\nall_products = []\nfor page in data.get('allPages', []):\n    products = page.get('products', [])\n    all_products.extend(products)\n\nprint(f\"Total products collected: {len(all_products)}\")   # for debug\n\n# === Your original pandas cleaning (unchanged) ===\ndf = pd.DataFrame(all_products)\n\nif 'images' in df.columns:\n    df['imageUrl'] = df['images'].apply(\n        lambda x: x[0]['url'] if isinstance(x, list) and len(x) > 0 else ''\n    )\n    df = df.drop(['images', 'variantOptions', 'deliveryLabelScheduleCode'], \n                 axis=1, errors='ignore')\n\nif 'priceList' in df.columns:\n    df['priceValue'] = df['priceList'].apply(\n        lambda x: x[-1]['value'] \n        if isinstance(x, list) and len(x) > 0 and x[-1].get('priceType') == 'DISCOUNT' \n        else None\n    )\n    df['priceValue_BUY'] = df['priceList'].apply(\n        lambda x: x[-1]['value'] \n        if isinstance(x, list) and len(x) > 0 and x[-1].get('priceType') == 'BUY' \n        else None\n    )\n    df['priceValue'] = df['priceValue'].fillna(df['priceValue_BUY'])\n\nif 'code' in df.columns:\n    df = df[['code', 'name', 'priceValue', 'url', 'imageUrl', 'categories', 'countryOfOrigin', 'purchasable', 'salesVolume', 'numberOfReviews', 'averageRating']].rename(columns={\n        'code': 'itemId',\n        'name': 'itemName',\n        'priceValue': 'itemPrice_Curr',\n        'url': 'itemURL',\n        'categories': 'category'\n    })\n\n# === Add static fields from collector ===\ndf['recordDatetime'] = data['static'].get('recordDatetime', pd.Timestamp.today().strftime('%Y-%m-%d'))\ndf['StoreID'] = data['static'].get('StoreID', '')\n\n# === Return flat list (one item per product) ===\njson_data = json.loads(df.to_json(orient='records'))\nreturn [{'json': row} for row in json_data]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1408,
+        -144
+      ],
+      "id": "ef795132-bfed-4330-9178-d4006b4c5fb9",
+      "name": "Data cleansing [Code in Python]"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://test-vercel-psi-eight.vercel.app/api/insertItem",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{$input.all().map(i => i.json)}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1632,
+        -144
+      ],
+      "id": "37a62d23-d086-41aa-b5f3-3dc6eb5730d0",
+      "name": "Batch insert NeonDB via API [HTTP Request]",
+      "executeOnce": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "54dR4mvQadumNzNP",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "numberInputs": 3
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1856,
+        416
+      ],
+      "id": "c6fd008d-a2f9-408c-a376-2e195d34b5ce",
+      "name": "Parse parameter & wait for all flows completion [Merge]"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "tWFnLm6HOJ6e9sEC",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/tWFnLm6HOJ6e9sEC",
+          "cachedResultName": "Get price history per products"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [
+        2080,
+        432
+      ],
+      "id": "04d4b45a-cdb0-4063-b40e-f691b2c930e1",
+      "name": "Get price history [Execution Sub-Workflow]",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "url": "https://test-vercel-psi-eight.vercel.app/api/selectCategory?search=NEW&limit=9999",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2320,
+        432
+      ],
+      "id": "f8ab8744-8cb2-4629-a7ce-d7b8bb4f3bbb",
+      "name": "Get new category list from NeonDB via API [HTTP Request]1",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://test-vercel-psi-eight.vercel.app/api/insertCategoryAiProcess",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $input.all().flatMap(i => i.json.data ?? []) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        2576,
+        432
+      ],
+      "id": "17efd8a6-ffc5-4d8b-bc01-9f8aba6b3350",
+      "name": "Batch insert category for AI process into NeonDB via API [HTTP Request]1",
+      "executeOnce": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "54dR4mvQadumNzNP",
+          "name": "Bearer Auth account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Initial currentDatetime and store ID variable [Edit Fields]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get token [Crawl and Scrape]": {
+      "main": [
+        [
+          {
+            "node": "Save token & initial variable currentPage [Edit Fields]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Initial currentDatetime and store ID variable [Edit Fields]": {
+      "main": [
+        [
+          {
+            "node": "Get token [Crawl and Scrape]",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parse parameter & wait for all flows completion [Merge]",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Save token & initial variable currentPage [Edit Fields]": {
+      "main": [
+        [
+          {
+            "node": "Query product list [HTTP Request]",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Parse parameter & wait for all flows completion [Merge]",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Query product list [HTTP Request]": {
+      "main": [
+        [
+          {
+            "node": "Loop: currentPage <= totalPage? [If]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop: currentPage <= totalPage? [If]": {
+      "main": [
+        [
+          {
+            "node": "Save products and update currentPage var [Edit Fields]",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Concat product list per pagination [Code in JavaScript]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save products and update currentPage var [Edit Fields]": {
+      "main": [
+        [
+          {
+            "node": "Query product list [HTTP Request]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Concat product list per pagination [Code in JavaScript]": {
+      "main": [
+        [
+          {
+            "node": "Data cleansing [Code in Python]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data cleansing [Code in Python]": {
+      "main": [
+        [
+          {
+            "node": "Batch insert NeonDB via API [HTTP Request]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch insert NeonDB via API [HTTP Request]": {
+      "main": [
+        [
+          {
+            "node": "Parse parameter & wait for all flows completion [Merge]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse parameter & wait for all flows completion [Merge]": {
+      "main": [
+        [
+          {
+            "node": "Get price history [Execution Sub-Workflow]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get price history [Execution Sub-Workflow]": {
+      "main": [
+        [
+          {
+            "node": "Get new category list from NeonDB via API [HTTP Request]1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get new category list from NeonDB via API [HTTP Request]1": {
+      "main": [
+        [
+          {
+            "node": "Batch insert category for AI process into NeonDB via API [HTTP Request]1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f429ff9b-e372-4ee1-98ce-b71456bd6218",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c09e6c813798729efaffbbb5de0f63999438b9ccbb6a4e37c3915b9d44904c6d"
+  },
+  "id": "ttqCjgruys76ir08",
+  "tags": []
+}

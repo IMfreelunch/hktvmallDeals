@@ -1,0 +1,393 @@
+{
+  "name": "AI-assisted category analysis",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -496,
+        -552
+      ],
+      "id": "3a0b50eb-ef09-48da-9577-4a35449db766",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "url": "https://test-vercel-psi-eight.vercel.app/api/selectCategoryAiProcess?limit=9999",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -272,
+        -552
+      ],
+      "id": "51cf0c6a-dc6e-411a-9d2e-a92040127b33",
+      "name": "Get category list from NeonDB via API [HTTP Request]1",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "maxItems": 10
+      },
+      "type": "n8n-nodes-base.limit",
+      "typeVersion": 1,
+      "position": [
+        176,
+        -624
+      ],
+      "id": "d79a8677-f050-4a6c-9d61-fc0d6f39e336",
+      "name": "Limit entries for quick trial [Limit]",
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "language": "pythonNative",
+        "pythonCode": "# Input = 1 item with \"data\": [220 products]\ndata = _items[0]['json'].get('records', [])\n\n# Turn into 220 separate items (one product per item)\nreturn [{'json': d} for d in data]"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        -552
+      ],
+      "id": "bbabbef8-4ae0-4111-aa69-6108f9a39a92",
+      "name": "Data cleansing [Code in Python]"
+    },
+    {
+      "parameters": {
+        "batchSize": 20,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        400,
+        -552
+      ],
+      "id": "17041d24-7e98-4fcd-bfa4-800d1ef4e4cf",
+      "name": "Loop with 20 items per batch [Loop Over Items]"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst allCategories = [];\n\nitems.forEach(item => {\n  let contentStr = item.json.content || '';\n\n  // Normalize formatting to make parsing reliable\n  contentStr = contentStr\n    .replace(/\\n/g, '')\n    .replace(/\\s+/g, ' ')\n    .trim();\n\n  if (contentStr === '[]' || contentStr === '' || !contentStr) return;\n\n  try {\n    const parsed = JSON.parse(contentStr);\n\n    if (Array.isArray(parsed)) {\n      parsed.forEach(obj => {\n        if (obj && typeof obj === 'object') {\n          const code = (obj.categorycode || '').trim();\n          if (code !== '') {\n            allCategories.push({\n              categorycode: code,\n              categoryname: (obj.categoryname || '').trim()\n            });\n          }\n        }\n      });\n    }\n  } catch (e) {\n    // skip bad entries silently\n  }\n});\n\n// Return ONE item containing the plain object (no outer array)\nreturn {\n  json: {\n    categories: allCategories\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        976,
+        -528
+      ],
+      "id": "49fcbebe-6ae4-4c53-9baa-1e8823831e93",
+      "name": "Data cleansing and filter [Code in JavaScript]"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "llama3.2:latest",
+          "mode": "list",
+          "cachedResultName": "llama3.2:latest"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are a strict category classifier.\nThe user will give you a JSON object like this:\n\n{ \"data\": [ { \"categorycode\": \"...\", \"categoryname\": \"...\" }, ... ] }\n\nFind every category where categoryname is related to pets (cat, dog, pet food, pet snacks, litter, pet cleaning, pet toys, pet grooming, etc.).\n\nReply with valid JSON in **exactly** this structure — nothing else:\n\n{\n  \"pet_category_codes\": \"AAxxxxxx,AAyyyyyy,AAzzzzzz\"\n}\n\nIf no matches → \"pet_category_codes\": \"\"\n\nExamples of pet-related names in Traditional Chinese:\n- 貓狗用品\n- 成貓糧\n- 高齡貓糧\n- 貓小食\n- 貓砂\n- 成犬糧\n- 犬小食\n- 寵物尿墊\n- 寵物濕紙巾",
+              "role": "assistant"
+            },
+            {
+              "content": "=請依照上一則說明，從以下 JSON 陣列中，\n篩選出所有你判斷為「寵物食品或寵物用品」的項目。\n\n請輸出一個 JSON array，只包含寵物相關的項目，\n每個元素保留原來的 categorycode 和 categoryname，\n不要加其他欄位，也不要多餘文字說明。\n\n這是資料：\n{{ JSON.stringify($json) }}\n"
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0,
+          "top_p": 0.1,
+          "num_predict": 2048,
+          "keep_alive": "0",
+          "num_batch": 64,
+          "format": "json"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.ollama",
+      "typeVersion": 1,
+      "position": [
+        624,
+        -624
+      ],
+      "id": "f0301023-e27d-490c-89f5-a3fa684f9c56",
+      "name": "AI analyze whether category is a Pet-related item [Message a model (Classify Pet / Snack)]",
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 300,
+      "credentials": {
+        "ollamaApi": {
+          "id": "D80d7pZMdnmRdXAZ",
+          "name": "Ollama account"
+        }
+      },
+      "notes": "Attached the list in an array format. One item is a category of prodcut extracted from online shop, a supermarket in Hong Kong. Please find out which category is related to Pet Food or Pet-related, pet cleaning items."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://test-vercel-psi-eight.vercel.app/api/insertCustomCategoryType",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ \n  $('Data cleansing and filter [Code in JavaScript]').item.json.categories.map(cat => ({\n    categoryCode: cat.categorycode,\n    customType: \"isPet\"\n  }))\n}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1200,
+        -528
+      ],
+      "id": "51243ce1-3285-4dd7-8a13-c06c2f047782",
+      "name": "Batch insert custom category types (isPet) to NeonDB via API [HTTP Request]",
+      "executeOnce": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "54dR4mvQadumNzNP",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://test-vercel-psi-eight.vercel.app/api/updateCategoryAiProcess",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpBearerAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $input.all()\n   .filter(i => i.json && i.json.categories)\n   .flatMap(i => i.json.categories) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1648,
+        -552
+      ],
+      "id": "88e4fac9-718c-47bc-ae78-eca92ff2f603",
+      "name": "Batch update processed status to NeonDB [HTTP Request]",
+      "executeOnce": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "54dR4mvQadumNzNP",
+          "name": "Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\n\nconst allCategories = [];\n\nitems.forEach(item => {\n  let contentStr = item.json.content || '';\n\n  // Normalize formatting to make parsing reliable\n  contentStr = contentStr\n    .replace(/\\n/g, '')\n    .replace(/\\s+/g, ' ')\n    .trim();\n\n  if (contentStr === '[]' || contentStr === '' || !contentStr) return;\n\n  try {\n    const parsed = JSON.parse(contentStr);\n\n    if (Array.isArray(parsed)) {\n      parsed.forEach(obj => {\n        if (obj && typeof obj === 'object') {\n          const code = (obj.categorycode || '').trim();\n          if (code !== '') {\n            allCategories.push({\n              categoryCode: code,\n              isCompleted: true\n            });\n          }\n        }\n      });\n    }\n  } catch (e) {\n    // skip bad entries silently\n  }\n});\n\n// Return ONE item containing the plain object (no outer array)\nreturn {\n  json: {\n    categories: allCategories\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        -720
+      ],
+      "id": "087fd76a-8765-4931-8d59-325019a4d8f7",
+      "name": "Prepare data strcuture to update process status table [Code in JavaScript]"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1424,
+        -624
+      ],
+      "id": "f4835cb0-9440-4e16-952d-2458c1825f03",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Get category list from NeonDB via API [HTTP Request]1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get category list from NeonDB via API [HTTP Request]1": {
+      "main": [
+        [
+          {
+            "node": "Data cleansing [Code in Python]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Limit entries for quick trial [Limit]": {
+      "main": [
+        [
+          {
+            "node": "Loop with 20 items per batch [Loop Over Items]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data cleansing [Code in Python]": {
+      "main": [
+        [
+          {
+            "node": "Limit entries for quick trial [Limit]",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Loop with 20 items per batch [Loop Over Items]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop with 20 items per batch [Loop Over Items]": {
+      "main": [
+        [],
+        [
+          {
+            "node": "AI analyze whether category is a Pet-related item [Message a model (Classify Pet / Snack)]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data cleansing and filter [Code in JavaScript]": {
+      "main": [
+        [
+          {
+            "node": "Batch insert custom category types (isPet) to NeonDB via API [HTTP Request]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI analyze whether category is a Pet-related item [Message a model (Classify Pet / Snack)]": {
+      "main": [
+        [
+          {
+            "node": "Data cleansing and filter [Code in JavaScript]",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Prepare data strcuture to update process status table [Code in JavaScript]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch insert custom category types (isPet) to NeonDB via API [HTTP Request]": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Batch update processed status to NeonDB [HTTP Request]": {
+      "main": [
+        [
+          {
+            "node": "Loop with 20 items per batch [Loop Over Items]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare data strcuture to update process status table [Code in JavaScript]": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Batch update processed status to NeonDB [HTTP Request]",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "4f394623-cc3f-4771-b5a0-45e18ecd6ad3",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c09e6c813798729efaffbbb5de0f63999438b9ccbb6a4e37c3915b9d44904c6d"
+  },
+  "id": "AaLmRGApQpxSgyHZ",
+  "tags": []
+}
