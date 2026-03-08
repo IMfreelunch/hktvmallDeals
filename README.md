@@ -3,13 +3,13 @@
 
 Personal project showcase – end-to-end automation for finding discounted near-expiry "green" products using HKTVmall price history
 
-**Live demo**: [View Web App →](https://your-vercel-app-url.vercel.app)
+**Live demo**: [View Web App →](https://test-vercel-psi-eight.vercel.app/)
 
-**Interactive Slides:** [Open Presentation on Gamma →](https://gamma.app/public/ko7hcmfutkleg6a)
+**Interactive Slides:** [Open Presentation on Gamma →](https://gamma.app/docs/Orchestrating-n8n-LLM-AI-Assisted-Coding-13nckntjjt1802z)
 
 ---
 
-## Slide 1 – Project Overview
+## 1 – Project Overview
 
 **Project Showcase: Orchestrating n8n + LLM + AI-assisted Coding**
 
@@ -37,7 +37,7 @@ Current price: **HK$10** | Historical max price: **HK$70**
 This project calculates the real discount using:
 
 $$    
-\text{Discount (\%)} = \left( \frac{1 - P_{\text{current}}}{P_{\text{max}}} \right) \times 100
+\text{Discount (\%)} = \left( 1 -\frac{P_{\text{current}}}{P_{\text{max}}} \right) \times 100
     $$
 
 **Result for this example:** ≈ **85.7%**
@@ -45,7 +45,8 @@ $$
 - Shows how n8n + LLM automate spotting these opportunities from price history
 - Turns raw e-commerce data into personalized deal dashboard
 
-<image-card alt="HKTVmall product example – current price HK$10 and history up to HK$70" src="screenshots/hktvmall-product-example.png" ></image-card>
+![HKTVmall product example – current price HK$10 and history up to HK$70](screenshots/hktvmall-product-example.png)
+
 
 ---
 
@@ -64,7 +65,8 @@ This project addresses these issues by using n8n workflows + AI analysis to:
 - Apply **personal preferences** (exclude unwanted categories)
 - Enable faster, smarter searching for green/near-expiry bargains
 
-<image-card alt="HKTVmall product list page – showing no discount sorting or exclude options" src="screenshots/hktvmall-list-no-features.png" ></image-card>
+![HKTVmall product list page – showing no discount sorting or exclude options](screenshots/hktvmall-list-no-features.png)
+
 
 ---
 
@@ -81,9 +83,10 @@ Key features you can see in the screenshot:
 - Custom filters (exclude categories with AI-assisted analysis)
 - Clean, responsive UI hosted on Vercel
 
-<image-card alt="Web App main view – product list with discounts, sorting, and filters" src="screenshots/web-app-main-view.png" ></image-card>
+**Live URL**: [https://test-vercel-psi-eight.vercel.app/](https://test-vercel-psi-eight.vercel.app/)
 
-**Live URL**: [https://your-vercel-app-url.vercel.app](https://your-vercel-app-url.vercel.app)
+![Web App main view – product list with discounts, sorting, and filters](screenshots/web-app-main-view.png)
+
 
 ---
 
@@ -102,18 +105,15 @@ No-code visual builder + great Docker support + native Ollama integration = perf
 
 - **Get Products per Store**
 - This workflow manages API requests and data parsing to fetch product listings from HKTVmall stores.
-
-<image-card alt="Main workflow to get prodcuts per store" src="screenshots/n8n-workflow-1.png" ></image-card>
+![Main workflow to get prodcuts per store](screenshots/n8n-workflow-1.png)
 
 - **Price History Subflow**
 - Responsible for retrieving and enriching price history data for products, including database lookups and data merging.
-
-<image-card alt="Main workflow to get prodcuts per store" src="screenshots/n8n-workflow-2.png" ></image-card>
+![Subflow to get price history per item](screenshots/n8n-workflow-2.png)
 
 - **AI Category Tagging**
 - Utilizes the Ollama LLM for AI-assisted category analysis and tagging, processing text and updating database nodes.
-
-<image-card alt="Main workflow to get prodcuts per store" src="screenshots/n8n-workflow-3.png" ></image-card>
+![Workflow to process AI-assisted analysis on product category](screenshots/n8n-workflow-3.png)
 
 ---
 
@@ -208,10 +208,45 @@ Human spot-checking of the stored results shows ***~70%* category classification
 
 ---
 
-## Quick Summary & Motivation
+## Deployment & Quick Start
 
-- **Why this stack?** Fast prototyping + local/low-cost AI + reliable automation
-- **Personal driver:** I built this because I wanted an easier way to find genuine bargains on near-expiry sustainable products
-- **Key learnings:** Effective orchestration of no-code tools (n8n), local LLM (Ollama), AI-assisted coding (Cursor.ai), and simple hosting (Vercel + Neon)
+**Prerequisites**  
+- Docker (for n8n + Ollama)  
+- Vercel account + Neon PostgreSQL (free tier)  
+- Ollama with `llama3.2:3b` pulled
 
-Feel free to clone, fork, or reach out if you'd like to discuss the code or implementation!
+**Steps**
+
+1. **Backend services**  
+   Run n8n core + task runner (v1.26.4 recommended)  
+   Start Ollama (`ollama serve` + `ollama pull llama3.2:3b`)
+
+2. **Frontend + DB**  
+   Push `/vercel` folder contents to your repo  
+   Deploy via Vercel → link Neon DB (set `DATABASE_URL`)
+
+3. **Database**  
+   Execute the SQL migration scripts (in `/vercel` or `/sql`)
+
+4. **n8n workflows**  
+   Import all `.json` files from `/n8n` folder  
+   Set credentials: Neon PostgreSQL + Ollama[](http://host.docker.internal:11434)
+
+5. **Activate**  
+   In “Get products per store” workflow:  
+   - Enter a valid HKTVmall **store ID**  
+   - Trigger / schedule
+
+Done. Pipeline should scrape → enrich with LLM → store → serve via Vercel frontend.
+
+**Notes**  
+- Rate limiting possible on frequent HKTVmall requests → add delays if needed  
+- Model upgrade (8b+) improves category accuracy if hardware allows
+
+---
+
+## Final Note
+Thanks for checking out the project!  
+Feel free to clone, fork, or reach out if you'd like to discuss the code!
+
+Happy coding!
